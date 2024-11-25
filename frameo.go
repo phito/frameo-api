@@ -11,9 +11,7 @@ import (
 
 func isScreenAwake() (bool, error) {
 	cmd := exec.Command("adb", "shell", "dumpsys", "power")
-
 	out, err := cmd.CombinedOutput()
-
 	if err != nil {
 		return false, err
 	}
@@ -35,9 +33,7 @@ func toggleScreen() error {
 
 func getBrightness() (int, error) {
 	cmd := exec.Command("adb", "shell", "dumpsys", "power")
-
 	out, err := cmd.CombinedOutput()
-
 	if err != nil {
 		return 0, err
 	}
@@ -53,6 +49,21 @@ func getBrightness() (int, error) {
 	}
 
 	return 0, fmt.Errorf("unable to find screen brightness")
+}
+
+func setBrightness(brightness int) error {
+	cmd := exec.Command("adb", "shell", "settings", "put", "system", "screen_brightness", strconv.Itoa(brightness))
+	return cmd.Run()
+}
+
+func swipeRight() error {
+	cmd := exec.Command("adb", "shell", "input", "swipe", "800", "500", "100", "500")
+	return cmd.Run()
+}
+
+func swipeLeft() error {
+	cmd := exec.Command("adb", "shell", "input", "swipe", "100", "500", "800", "500")
+	return cmd.Run()
 }
 
 func handleBrightness(writer http.ResponseWriter, request *http.Request) {
@@ -91,11 +102,7 @@ func handleBrightness(writer http.ResponseWriter, request *http.Request) {
 		return
 	}
 
-	fmt.Println("Setting brightness to", brightness)
-
-	cmd := exec.Command("adb", "shell", "settings", "put", "system", "screen_brightness", strconv.Itoa(brightness))
-	err = cmd.Run()
-
+	err = setBrightness(brightness)
 	if err != nil {
 		http.Error(writer, "Error occured while setting brightness", http.StatusInternalServerError)
 		return
@@ -161,9 +168,38 @@ func handleScreen(writer http.ResponseWriter, request *http.Request) {
 	writer.WriteHeader(http.StatusOK)
 }
 
+func handleNext(writer http.ResponseWriter, request *http.Request) {
+	if request.Method != http.MethodPost {
+		http.Error(writer, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	err := swipeRight()
+	if err != nil {
+		http.Error(writer, err.Error(), http.StatusInternalServerError)
+		return
+	}
+}
+
+func handlePrevious(writer http.ResponseWriter, request *http.Request) {
+	if request.Method != http.MethodPost {
+		http.Error(writer, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	err := swipeLeft()
+	if err != nil {
+		http.Error(writer, err.Error(), http.StatusInternalServerError)
+		return
+	}
+}
+
 func main() {
 	http.HandleFunc("/brightness", handleBrightness)
 	http.HandleFunc("/screen", handleScreen)
+	http.HandleFunc("/next", handleNext)
+	http.HandleFunc("/previous", handlePrevious)
+
 	err := http.ListenAndServe(":5000", nil)
 	if err != nil {
 		fmt.Println("Error starting server:", err)
